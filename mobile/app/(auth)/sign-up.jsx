@@ -9,18 +9,25 @@ import {
   TouchableOpacity,
 } from "react-native";
 import { useRouter } from "expo-router";
-import { useSignUp } from "@clerk/clerk-expo";
-import { useState } from "react";
+import { useSignUp, useOAuth } from "@clerk/clerk-expo";
+import { useState, useCallback } from "react";
 import { authStyles } from "../../assets/styles/auth.styles";
 import { Image } from "expo-image";
 import { COLORS } from "../../constants/colors";
 
 import { Ionicons } from "@expo/vector-icons";
 import VerifyEmail from "./verify-email";
+import { useWarmUpBrowser } from "../../hooks/useWarmUpBrowser";
 
 const SignUpScreen = () => {
+  useWarmUpBrowser();
   const router = useRouter();
-  const { isLoaded, signUp } = useSignUp();
+  const { isLoaded, signUp, setActive } = useSignUp();
+
+  const { isLoaded: isAuthLoaded, isSignedIn } = useAuth();
+  const { startOAuthFlow: startGoogleFlow } = useOAuth({ strategy: "oauth_google" });
+  const { startOAuthFlow: startAppleFlow } = useOAuth({ strategy: "oauth_apple" });
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -53,6 +60,32 @@ const SignUpScreen = () => {
       setLoading(false);
     }
   };
+
+  const onSocialSignUpPress = useCallback(async (strategy) => {
+    if (isSignedIn) {
+      router.replace("/(tabs)");
+      return;
+    }
+
+    try {
+      const { startOAuthFlow } = strategy === "google" ? { startOAuthFlow: startGoogleFlow } : { startOAuthFlow: startAppleFlow };
+
+      const { createdSessionId, setActive: setOAuthActive } =
+        await startOAuthFlow();
+
+      if (createdSessionId) {
+        setOAuthActive({ session: createdSessionId });
+      }
+    } catch (err) {
+      if (err.errors?.[0]?.code === "already_signed_in" || err.message?.includes("already signed in")) {
+        router.replace("/(tabs)");
+        return;
+      }
+      console.error("OAuth error", err);
+      Alert.alert("Error", `Could not sign up with ${strategy}`);
+    }
+  }, [startGoogleFlow, startAppleFlow, isSignedIn]);
+
 
   if (pendingVerification)
     return (
@@ -133,9 +166,37 @@ const SignUpScreen = () => {
               </Text>
             </TouchableOpacity>
 
+            {/* DIVIDER */}
+            <View style={authStyles.dividerContainer}>
+              <View style={authStyles.dividerLine} />
+              <Text style={authStyles.dividerText}>Or continue with</Text>
+              <View style={authStyles.dividerLine} />
+            </View>
+
+            {/* SOCIAL BUTTONS */}
+            <View style={authStyles.socialContainer}>
+              <TouchableOpacity
+                style={authStyles.socialButton}
+                onPress={() => onSocialSignUpPress("google")}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="logo-google" size={24} color={COLORS.primary} />
+                <Text style={authStyles.socialButtonText}>Google</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={authStyles.socialButton}
+                onPress={() => onSocialSignUpPress("apple")}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="logo-apple" size={24} color={COLORS.text} />
+                <Text style={authStyles.socialButtonText}>Apple</Text>
+              </TouchableOpacity>
+            </View>
+
             {/* Sign In Link */}
             <TouchableOpacity
-              style={authStyles.linkContainer}
+              style={[authStyles.linkContainer, { marginTop: 40 }]}
               onPress={() => router.back()}
             >
               <Text style={authStyles.linkText}>
@@ -150,3 +211,4 @@ const SignUpScreen = () => {
   );
 };
 export default SignUpScreen;
+
