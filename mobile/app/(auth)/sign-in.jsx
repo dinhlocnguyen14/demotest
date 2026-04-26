@@ -66,6 +66,12 @@ const SignInScreen = () => {
   };
 
   const handleSignIn = async () => {
+    // Nếu đã đăng nhập rồi (ví dụ qua social), chuyển thẳng vào home
+    if (isSignedIn) {
+      router.replace("/(tabs)");
+      return;
+    }
+
     if (!email || !password) {
       Alert.alert("Error", "Please fill in all fields");
       return;
@@ -83,11 +89,20 @@ const SignInScreen = () => {
 
       if (signInAttempt.status === "complete") {
         await setActive({ session: signInAttempt.createdSessionId });
+        router.replace("/(tabs)");
       } else {
         Alert.alert("Error", "Sign in failed. Please try again.");
         console.error(JSON.stringify(signInAttempt, null, 2));
       }
     } catch (err) {
+      // Nếu session đã tồn tại thì chuyển thẳng vào home
+      if (
+        err.errors?.[0]?.code === "session_exists" ||
+        err.message?.includes("already signed in")
+      ) {
+        router.replace("/(tabs)");
+        return;
+      }
       Alert.alert("Error", err.errors?.[0]?.message || "Sign in failed");
       console.error(JSON.stringify(err, null, 2));
     } finally {
@@ -102,24 +117,31 @@ const SignInScreen = () => {
     }
 
     try {
-      const { startOAuthFlow } = strategy === "google" ? { startOAuthFlow: startGoogleFlow } : { startOAuthFlow: startAppleFlow };
-      
+      const { startOAuthFlow } =
+        strategy === "google"
+          ? { startOAuthFlow: startGoogleFlow }
+          : { startOAuthFlow: startAppleFlow };
+
       const { createdSessionId, setActive: setOAuthActive } =
         await startOAuthFlow();
 
-      if (createdSessionId) {
-        setOAuthActive({ session: createdSessionId });
+      if (createdSessionId && setOAuthActive) {
+        await setOAuthActive({ session: createdSessionId });
+        router.replace("/(tabs)");
       }
     } catch (err) {
-      // Check if the error is "already signed in" and ignore it as the redirect will happen
-      if (err.errors?.[0]?.code === "already_signed_in" || err.message?.includes("already signed in")) {
+      // Nếu đã đăng nhập rồi thì chuyển thẳng vào home
+      if (
+        err.errors?.[0]?.code === "already_signed_in" ||
+        err.message?.includes("already signed in")
+      ) {
         router.replace("/(tabs)");
         return;
       }
       console.error("OAuth error", err);
       Alert.alert("Error", `Could not sign in with ${strategy}`);
     }
-  }, [startGoogleFlow, startAppleFlow, isSignedIn]);
+  }, [startGoogleFlow, startAppleFlow, isSignedIn, router]);
 
   return (
     <View style={authStyles.container}>

@@ -2,15 +2,39 @@ import { ClerkProvider, useAuth, useUser } from "@clerk/clerk-expo";
 import { tokenCache } from "@clerk/clerk-expo/token-cache";
 import { Slot, useRouter, useSegments } from "expo-router";
 import { useEffect } from "react";
+import { View } from "react-native";
 import { COLORS } from "../constants/colors";
 import SafeScreen from "../components/SafeScreen";
 import { saveAccountToRecent } from "../utils/accountStorage";
+import { ThemeProvider, useTheme } from "../context/ThemeContext";
 
 const publishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY;
 
 if (!publishableKey) {
   throw new Error(
     "Missing Publishable Key. Please set EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY in your .env",
+  );
+}
+
+function RootLayoutContent() {
+  const { themeName, isLoaded: themeLoaded } = useTheme();
+
+  if (!themeLoaded) return null;
+
+  return (
+    <ClerkProvider publishableKey={publishableKey} tokenCache={tokenCache} key={themeName}>
+      <SafeScreen>
+        <InitialLayout />
+      </SafeScreen>
+    </ClerkProvider>
+  );
+}
+
+export default function RootLayout() {
+  return (
+    <ThemeProvider>
+      <RootLayoutContent />
+    </ThemeProvider>
   );
 }
 
@@ -42,16 +66,6 @@ function InitialLayout() {
   }, [isSignedIn, isLoaded, segments]);
 
   return <Slot />;
-}
-
-export default function RootLayout() {
-  return (
-    <ClerkProvider publishableKey={publishableKey} tokenCache={tokenCache}>
-      <SafeScreen>
-        <InitialLayout />
-      </SafeScreen>
-    </ClerkProvider>
-  );
 }
 
 

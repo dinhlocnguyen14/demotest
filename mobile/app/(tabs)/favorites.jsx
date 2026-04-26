@@ -7,7 +7,8 @@ import {
   FlatList,
 } from "react-native";
 import { useClerk, useUser } from "@clerk/clerk-expo";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
+import { useFocusEffect } from "expo-router";
 import { API_URL } from "../../constants/api";
 import { favoritesStyles } from "../../assets/styles/favorites.styles";
 import { COLORS } from "../../constants/colors";
@@ -22,31 +23,34 @@ const FavoritesScreen = () => {
   const [favoriteRecipes, setFavoriteRecipes] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    const loadFavorites = async () => {
-      try {
-        const response = await fetch(`${API_URL}/favorites/${user.id}`);
-        if (!response.ok) throw new Error("Failed to fetch favorites");
+  useFocusEffect(
+    useCallback(() => {
+      const loadFavorites = async () => {
+        if (!user?.id) return;
+        setLoading(true);
+        try {
+          const response = await fetch(`${API_URL}/favorites/${user.id}`);
+          if (!response.ok) throw new Error("Failed to fetch favorites");
 
-        const favorites = await response.json();
+          const favorites = await response.json();
 
-        // transform the data to match the RecipeCard component's expected format
-        const transformedFavorites = favorites.map((favorite) => ({
-          ...favorite,
-          id: favorite.recipeId,
-        }));
+          // transform the data to match the RecipeCard component's expected format
+          const transformedFavorites = favorites.map((favorite) => ({
+            ...favorite,
+            id: favorite.recipeId,
+          }));
 
-        setFavoriteRecipes(transformedFavorites);
-      } catch (error) {
-        console.log("Error loading favorites", error);
-        Alert.alert("Error", "Failed to load favorites");
-      } finally {
-        setLoading(false);
-      }
-    };
+          setFavoriteRecipes(transformedFavorites);
+        } catch (error) {
+          console.log("Error loading favorites", error);
+        } finally {
+          setLoading(false);
+        }
+      };
 
-    loadFavorites();
-  }, [user.id]);
+      loadFavorites();
+    }, [user?.id])
+  );
 
   const handleSignOut = () => {
     Alert.alert("Logout", "Are you sure you want to logout?", [
